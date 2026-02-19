@@ -11,11 +11,31 @@
             "chat_id": 6791815865
         }
     ],
-    "posted_ids": [],
+    "posted_ids": [
+        "24"
+    ],
     "file_links": {
         "days after 12.8.2 mod t 5play.apk": "https://t.me/offlinegamelink/25",
         "human resource machine": "https://t.me/offlinegamelink/28",
         "spongebob krusty cook off": "https://t.me/offlinegamelink/29",
         "slender threads 1.2 mod t 5play.apk": "https://t.me/offlinegamelink/31"
+    },
+    "file_data": {
+        "days": {
+            "message_id": 25,
+            "chat_id": 6791815865
+        },
+        "human": {
+            "message_id": 28,
+            "chat_id": 6791815865
+        },
+        "spongebob": {
+            "message_id": 29,
+            "chat_id": 6791815865
+        },
+        "slender": {
+            "message_id": 31,
+            "chat_id": 6791815865
+        }
     }
 }
