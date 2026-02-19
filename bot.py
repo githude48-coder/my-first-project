@@ -17,10 +17,9 @@ def load_db():
         try:
             with open(DB_FILE, 'r') as f:
                 data = json.load(f)
-                # လိုအပ်သော Field များပါဝင်မှု ရှိမရှိ စစ်ဆေးခြင်း
-                if "games" not in data: data["games"] = []
-                if "posted_ids" not in data: data["posted_ids"] = []
-                if "file_links" not in data: data["file_links"] = {}
+                # Ensure all necessary keys exist
+                for key in ["games", "posted_ids", "file_links"]:
+                    if key not in data: data[key] = [] if key != "file_links" else {}
                 return data
         except:
             return {"games": [], "posted_ids": [], "file_links": {}}
@@ -34,19 +33,18 @@ def auto_run_process():
     db = load_db()
     updates = bot.get_updates()
     
-    # ၁။ Syncing: အသစ်ပို့ထားသမျှ ဖိုင်နှင့် Post များကို စာရင်းသွင်းခြင်း
+    # ၁။ Syncing: ဖိုင်လင့်ခ်တွေနဲ့ Post တွေကို ရှာဖွေမှတ်သားမယ်
     for up in updates:
         if not up.message: continue
         msg = up.message
         
-        # File Link မှတ်သားခြင်း
+        # APK File တွေ့ရင် Storage Link ကို မှတ်မယ်
         if msg.document and msg.document.file_name.endswith(".apk"):
             file_key = msg.document.file_name.split("-v")[0].replace("-", " ").lower().strip()
             clean_ch = FILE_STORE_CH.replace("@", "")
-            # Direct Message Link
             db["file_links"][file_key] = f"https://t.me/{clean_ch}/{msg.message_id}"
 
-        # Post (ပုံ+စာ) မှတ်သားခြင်း
+        # Post (ပုံ+စာ) တွေ့ရင် Database ထဲ ထည့်မယ်
         elif (msg.caption or msg.text) and (msg.photo or msg.video):
             text = msg.caption if msg.caption else msg.text
             if "Game:" in text:
@@ -59,41 +57,42 @@ def auto_run_process():
                     })
     save_db(db)
 
-    # ၂။ Filtering: တင်ပြီးသား ID များကို ဖယ်ထုတ်ပြီး ကျန်တာထဲမှ ကျပန်း (Random) တစ်ခုရွေးခြင်း
+    # ၂။ တစ်ခါတင်ရင် တစ်ခုပဲ တက်လာဖို့အတွက် ကျပန်းရွေးချယ်မယ်
     available = [g for g in db["games"] if str(g["post_id"]) not in db["posted_ids"]]
     
     if not available:
-        print("တင်စရာ အသစ်မရှိတော့ပါ။")
+        print("တင်စရာ အသစ်မရှိပါ။")
         return
 
     selected = random.choice(available)
     game_key = selected["name"].lower().strip()
-    # ဖိုင်လင့်ခ် ရှိမရှိစစ်၊ မရှိရင် Channel Link ပြပေးမယ်
+    # ဖိုင်လင့်ခ်ကို ရှာမယ်၊ မရှိရင် Channel Link ပေးမယ်
     download_url = db["file_links"].get(game_key, f"https://t.me/{FILE_STORE_CH.replace('@','')}")
 
     try:
-        # ၃။ တင်ဆက်ခြင်း: ပုံစံမပျက် Forward လုပ်ပြီးမှ Caption ကို ပြန်ပြင်ခြင်း
+        # ၃။ Post ကို Forward အရင်လုပ်မယ်
         sent_msg = bot.copy_message(POST_CH, selected["chat_id"], selected["post_id"])
         
-        orig = bot.get_message(selected["chat_id"], selected["post_id"])
-        caption = orig.caption if orig.caption else orig.text
+        # ၄။ Caption ကို Link မြှုပ်ပြီး Preview ပိတ်မယ်
+        orig_msg = bot.get_message(selected["chat_id"], selected["post_id"])
+        final_caption = orig_msg.caption if orig_msg.caption else orig_msg.text
         
-        # Link မြှုပ်ခြင်း (Markdown သုံးထားသည်)
-        caption = caption.replace("[ Download ]", f"[Download]({download_url})")
-        caption = caption.replace("Download", f"[Download]({download_url})")
+        # [ Download ] နေရာမှာ Link အစစ်ကို မြှုပ်ပေးခြင်း
+        final_caption = final_caption.replace("[ Download ]", f"[Download]({download_url})")
+        final_caption = final_caption.replace("Download", f"[Download]({download_url})")
 
         bot.edit_message_caption(
             chat_id=POST_CH,
             message_id=sent_msg.message_id,
-            caption=caption,
+            caption=final_caption,
             parse_mode="Markdown",
-            disable_web_page_preview=True # Preview ပိတ်ရန်
+            disable_web_page_preview=True # Preview ပိတ်ထားသည်
         )
         
-        # ၄။ Logging: တင်ပြီးသားအဖြစ် မှတ်သားခြင်း (နောက်တစ်ခါ လုံးဝ ပြန်မတင်ရန်)
+        # ၅။ တင်ပြီးကြောင်း မှတ်သားပြီး အလုပ်ရပ်မယ်
         db["posted_ids"].append(str(selected["post_id"]))
         save_db(db)
-        print(f"Success: Randomly Posted {selected['name']}.")
+        print(f"Success: Posted {selected['name']} with Link. Preview disabled.")
         return 
 
     except Exception as e:
