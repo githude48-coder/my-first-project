@@ -31,5 +31,5 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add database.json
-          git commit -m "Auto-update database from bot" || echo "No changes to commit"
+          git commit -m "Auto-update database" || echo "No changes to commit"
           git push
