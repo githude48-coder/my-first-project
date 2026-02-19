@@ -17,11 +17,14 @@ def load_db():
         try:
             with open(DB_FILE, 'r') as f:
                 data = json.load(f)
-                if "file_links" not in data: data["file_links"] = {}
+                # Key များစစ်ဆေးခြင်း
+                if "games" not in data: data["games"] = []
+                if "posted_ids" not in data: data["posted_ids"] = []
+                if "file_data" not in data: data["file_data"] = {}
                 return data
         except:
-            return {"games": [], "posted_ids": [], "file_links": {}}
-    return {"games": [], "posted_ids": [], "file_links": {}}
+            return {"games": [], "posted_ids": [], "file_data": {}}
+    return {"games": [], "posted_ids": [], "file_data": {}}
 
 def save_db(data):
     with open(DB_FILE, 'w') as f:
@@ -29,23 +32,26 @@ def save_db(data):
 
 def auto_run_process():
     db = load_db()
-    updates = bot.get_updates()
+    # Update အသစ်များကို ဖမ်းယူခြင်း
+    updates = bot.get_updates(offset=-50, limit=100)
     
-    # ၁။ Storage Channel ထဲက File Link တွေကို အရင်မှတ်သားမယ်
     for up in updates:
         if not up.message: continue
         msg = up.message
         
+        # APK File သိမ်းဆည်းခြင်း
         if msg.document and msg.document.file_name.endswith(".apk"):
-            file_key = msg.document.file_name.split("-v")[0].replace("-", " ").lower().strip()
-            clean_ch = FILE_STORE_CH.replace("@", "")
-            # ဖိုင်ရှိတဲ့နေရာရဲ့ တိုက်ရိုက်လင့်ခ်ကို သိမ်းမယ်
-            db["file_links"][file_key] = f"https://t.me/{clean_ch}/{msg.message_id}"
+            file_key = msg.document.file_name.lower().split("-")[0].strip()
+            db["file_data"][file_key] = {
+                "message_id": msg.message_id,
+                "chat_id": msg.chat.id
+            }
 
+        # Post (ပုံ+စာ) သိမ်းဆည်းခြင်း
         elif (msg.caption or msg.text) and (msg.photo or msg.video):
             text = msg.caption if msg.caption else msg.text
             if "Game:" in text:
-                game_name = text.split("Game:")[1].split("\n")[0].strip()
+                game_name = text.split("Game:")[1].split("\n")[0].strip().lower()
                 if not any(g['post_id'] == msg.message_id for g in db["games"]):
                     db["games"].append({
                         "name": game_name,
@@ -54,43 +60,36 @@ def auto_run_process():
                     })
     save_db(db)
 
-    # ၂။ မတင်ရသေးတာထဲက တစ်ခုပဲ ကျပန်းရွေးမယ်
+    # ၂။ မတင်ရသေးတာထဲက တစ်ခုတည်းကိုပဲ ကျပန်းရွေးမယ်
     available = [g for g in db["games"] if str(g["post_id"]) not in db["posted_ids"]]
-    if not available: return
+    
+    if not available:
+        print("တင်စရာ အသစ်မရှိပါ။")
+        return
 
+    # တစ်ခုတည်းကိုပဲ ကျပန်းရွေးချယ်
     selected = random.choice(available)
-    game_key = selected["name"].lower().strip()
-    # ဖိုင်လင့်ခ်ကို ရှာမယ်
-    download_url = db["file_links"].get(game_key, f"https://t.me/{FILE_STORE_CH.replace('@','')}")
+    game_key = selected["name"].split(" ")[0].strip()
+    file_info = db["file_data"].get(game_key)
 
     try:
-        # ၃။ Post ကို Forward အရင်လုပ်မယ်
-        sent_msg = bot.copy_message(POST_CH, selected["chat_id"], selected["post_id"])
+        # ၃။ Post ကို အရင်တင်မယ်
+        bot.copy_message(POST_CH, selected["chat_id"], selected["post_id"])
         
-        # ၄။ Caption ကို Link အဖြစ်ပြောင်းလဲပြီး Edit လုပ်မယ်
-        orig = bot.get_message(selected["chat_id"], selected["post_id"])
-        caption = orig.caption if orig.caption else orig.text
-        
-        # [ Download ] နေရာမှာ Link မြှုပ်ပေးခြင်း
-        final_caption = caption.replace("[ Download ]", f"[Download]({download_url})")
-        final_caption = final_caption.replace("Download", f"[Download]({download_url})")
+        # ၄။ File ရှိရင် အောက်ကနေ ချက်ချင်းလိုက်တင်မယ်
+        if file_info:
+            bot.copy_message(POST_CH, file_info["chat_id"], file_info["message_id"])
+            print(f"Success: Posted {selected['name']} with File.")
+        else:
+            print(f"Warning: File not found for {game_key}")
 
-        bot.edit_message_caption(
-            chat_id=POST_CH,
-            message_id=sent_msg.message_id,
-            caption=final_caption,
-            parse_mode="Markdown",
-            disable_web_page_preview=True # Preview ပိတ်ရန်
-        )
-        
+        # ၅။ တင်ပြီးကြောင်း ID ကို သေချာမှတ်မယ် (ဒါမှ နောက်တစ်ခါ အများကြီး ပြန်မတက်မှာပါ)
         db["posted_ids"].append(str(selected["post_id"]))
         save_db(db)
-        print(f"Success: Posted {selected['name']} with deep link.")
         return 
 
     except Exception as e:
         print(f"Error: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--post":
-        auto_run_process()
+    auto_run_process()
