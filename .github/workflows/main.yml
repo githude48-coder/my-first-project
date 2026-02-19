@@ -4,15 +4,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '30 23 * * *' # 6:00 AM Myanmar
-    - cron: '0 6 * * *'   # 12:30 PM Myanmar
-    - cron: '30 12 * * *' # 7:00 PM Myanmar
+    - cron: '0 0,6,12,18 * * *'
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # ဒီစာကြောင်းက အလိုလို ပြင်ခွင့်ပေးတာပါ
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -25,13 +23,13 @@ jobs:
       - name: Install Libraries
         run: pip install pyTelegramBotAPI
 
-      - name: Start Bot
+      - name: Run Bot Process
         run: python bot.py --post
 
-      - name: Save Memory to GitHub
+      - name: Commit and Push Changes
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
           git add database.json
-          git commit -m "Update posted_ids history" || echo "No changes to commit"
+          git commit -m "Auto-update database from bot" || echo "No changes to commit"
           git push
