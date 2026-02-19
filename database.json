@@ -1,4 +1,32 @@
 {
-    "games": [],
-    "posted_ids": []
+    "games": [
+        {
+            "original_msg_id": 25,
+            "chat_id": 6791815865,
+            "name": "Days After 12.8.2 Mod T 5Play"
+        },
+        {
+            "original_msg_id": 28,
+            "chat_id": 6791815865,
+            "name": "Human Resource Machine V1 0 6 5 Patched"
+        },
+        {
+            "original_msg_id": 29,
+            "chat_id": 6791815865,
+            "name": "Spongebob Krusty Cook Off V5 10 4 Mod"
+        },
+        {
+            "original_msg_id": 30,
+            "chat_id": 6791815865,
+            "name": "Slender Threads 1.2 Mod T 5Play"
+        },
+        {
+            "original_msg_id": 31,
+            "chat_id": 6791815865,
+            "name": "Slender Threads 1.2 Mod T 5Play"
+        }
+    ],
+    "posted_ids": [
+        "28"
+    ]
 }
