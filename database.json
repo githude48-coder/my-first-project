@@ -1,41 +1,17 @@
 {
-    "posts": [
+    "games": [
         {
-            "id": 24,
+            "name": "Days After - zombie survival",
+            "post_id": 24,
             "chat_id": 6791815865
         },
         {
-            "id": 25,
-            "chat_id": 6791815865
-        },
-        {
-            "id": 26,
-            "chat_id": 6791815865
-        },
-        {
-            "id": 27,
-            "chat_id": 6791815865
-        },
-        {
-            "id": 28,
-            "chat_id": 6791815865
-        },
-        {
-            "id": 29,
-            "chat_id": 6791815865
-        },
-        {
-            "id": 30,
-            "chat_id": 6791815865
-        },
-        {
-            "id": 31,
+            "name": "Human Resource Machine",
+            "post_id": 27,
             "chat_id": 6791815865
         }
     ],
     "posted_ids": [
-        "29",
-        "27",
         "24"
     ]
 }
