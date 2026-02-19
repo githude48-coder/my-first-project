@@ -1,0 +1,35 @@
+name: Auto Post Bot
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '30 23 * * *' # 6:00 AM Myanmar
+    - cron: '0 6 * * *'   # 12:30 PM Myanmar
+    - cron: '30 12 * * *' # 7:00 PM Myanmar
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Libraries
+        run: pip install pyTelegramBotAPI
+
+      - name: Start Bot
+        run: python bot.py --post
+
+      - name: Save Memory
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add database.json
+          git commit -m "Update history" || exit 0
+          git push
