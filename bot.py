@@ -6,8 +6,8 @@ import sys
 
 # --- CONFIGURATION ---
 TOKEN = "8274761916:AAF5wk3UDg51JFQnFCwa58WGvLiN8vpzgSQ"
-SOURCE_CH = "@offlinegamelink" # Post တွေရှိတဲ့နေရာ
-TARGET_CH = "@offlinegame999" # Post တင်မယ့်နေရာ
+FILE_STORE_CH = "@offlinegamelink" 
+POST_CH = "@offlinegame999"      
 DB_FILE = 'database.json'
 
 bot = telebot.TeleBot(TOKEN)
@@ -18,55 +18,64 @@ def load_db():
             with open(DB_FILE, 'r') as f:
                 return json.load(f)
         except:
-            return {"posted_ids": []}
-    return {"posted_ids": []}
+            return {"games": [], "posted_ids": []}
+    return {"games": [], "posted_ids": []}
 
 def save_db(data):
     with open(DB_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-def auto_post():
+# --- ဖိုင်ပို့ရင် ချက်ချင်း သိမ်းပြီး ပြန်ဖြေမယ့်အပိုင်း ---
+@bot.message_handler(content_types=['document'])
+def handle_incoming_file(message):
     db = load_db()
+    file_name = message.document.file_name.replace(".apk", "").replace("-", " ").title()
     
-    # Post ID နံပါတ် ၁ ကနေ ၁၀၀၀ အထိထဲက ကျပန်းရွေးမယ်
-    # (သင် Post တွေ ထပ်တင်ရင် ၁၀၀၀ ဂဏန်းကို တိုးပေးလို့ရပါတယ်)
-    start_id = 1
-    end_id = 1000 
+    # Database ထဲ ထည့်မယ်
+    db["games"].append({
+        "original_msg_id": message.message_id,
+        "from_chat_id": message.chat.id,
+        "name": file_name
+    })
+    save_db(db)
     
-    all_possible_ids = list(range(start_id, end_id + 1))
+    # ဒီစာသားလေး ပေါ်လာရင် Bot အလုပ်လုပ်နေတာ သေချာပါပြီ
+    bot.reply_to(message, f"✅ သိမ်းလိုက်ပါပြီ- {file_name}\n\nအခု GitHub Actions ကိုသွားပြီး Run workflow နှိပ်ရင် Post တင်ပေးပါလိမ့်မယ်။")
+
+def auto_run_process():
+    db = load_db()
+    all_games = db.get("games", [])
     posted_ids = db.get("posted_ids", [])
+    available = [g for g in all_games if str(g["original_msg_id"]) not in posted_ids]
 
-    # မတင်ရသေးတဲ့ ID တွေကိုပဲ ရွေးမယ်
-    available = [i for i in all_possible_ids if i not in posted_ids]
-
-    # အကုန်တင်ပြီးရင် အစက ပြန်စမယ်
     if not available:
         db["posted_ids"] = []
-        available = all_possible_ids
+        available = all_games
+        if not available: return
 
-    # ကျပန်း Post ID တစ်ခုကို ရွေးတယ်
-    selected_id = random.choice(available)
-
+    selected = random.choice(available)
     try:
-        # copy_message က ရေးထားတဲ့ Post ကို ပုံစံမပျက် (စာ၊ ပုံ၊ Button) အကုန်ကူးပေးတာပါ
-        bot.copy_message(TARGET_CH, SOURCE_CH, selected_id)
-        
-        # တင်ပြီးကြောင်း မှတ်ထားမယ်
-        db["posted_ids"].append(selected_id)
+        sent_file = bot.copy_message(FILE_STORE_CH, selected["from_chat_id"], selected["original_msg_id"])
+        clean_ch = FILE_STORE_CH.replace("@", "")
+        file_link = f"https://t.me/{clean_ch}/{sent_file.message_id}"
+
+        caption = (
+            f"Game: **{selected['name']}** ❞\n\n"
+            f"Offline 🚩 ❞\n\n"
+            f"Link: [ [Download]({file_link}) ] ❞"
+        )
+        bot.send_message(POST_CH, caption, parse_mode="Markdown")
+        db["posted_ids"].append(str(selected["original_msg_id"]))
         save_db(db)
-        print(f"Success: Copied Post ID {selected_id}")
-        
+        print(f"Success: Posted {selected['name']}")
     except Exception as e:
-        # တကယ်လို့ အဲ့ဒီ ID မှာ Post မရှိရင် (ဥပမာ ဖျက်ထားရင်) နောက်တစ်ခု ထပ်ရွေးခိုင်းမယ်
-        print(f"ID {selected_id} is empty or error, trying another...")
-        # ဒီ ID ကို တင်ပြီးသားစာရင်းထဲ ထည့်လိုက်မှ နောက်တစ်ခါ ထပ်မရွေးမှာပါ
-        db["posted_ids"].append(selected_id)
-        save_db(db)
-        auto_post() 
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--post":
-        auto_post()
+        auto_run_process()
     else:
-        print("Bot is listening for commands...")
+        # Bot ကို ခဏ Live ပေးထားမယ် (ဖိုင်တွေ ပို့နေတဲ့အချိန်မှာ)
+        print("Bot is listening... (ဖိုင်တွေ ပို့လို့ရပါပြီ)")
         bot.polling(none_stop=True)
+
