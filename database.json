@@ -1,5 +1,21 @@
 {
-  "games": [],
-  "posted_ids": [],
-  "file_links": {}
+    "games": [
+        {
+            "name": "Days After - zombie survival",
+            "post_id": 24,
+            "chat_id": 6791815865
+        },
+        {
+            "name": "Human Resource Machine",
+            "post_id": 27,
+            "chat_id": 6791815865
+        }
+    ],
+    "posted_ids": [],
+    "file_links": {
+        "days after 12.8.2 mod t 5play.apk": "https://t.me/offlinegamelink/25",
+        "human resource machine": "https://t.me/offlinegamelink/28",
+        "spongebob krusty cook off": "https://t.me/offlinegamelink/29",
+        "slender threads 1.2 mod t 5play.apk": "https://t.me/offlinegamelink/31"
+    }
 }
