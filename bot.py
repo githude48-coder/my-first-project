@@ -28,44 +28,57 @@ def save_db(data):
     with open(DB_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-# Bot ဆီ ဖိုင်ပို့ရင် သိမ်းမယ့်အပိုင်း
-@bot.message_handler(content_types=['document'])
-def handle_incoming_file(message):
+# --- AUTO SYNC: Bot ဆီပို့ထားသမျှ ဖိုင်တွေကို Database ထဲ အလိုလို ထည့်ပေးမည့်အပိုင်း ---
+def sync_new_files():
     db = load_db()
-    file_name = message.document.file_name.replace(".apk", "").replace("-", " ").title()
-    db["games"].append({
-        "original_msg_id": message.message_id,
-        "from_chat_id": message.chat.id,
-        "name": file_name
-    })
-    save_db(db)
-    bot.reply_to(message, f"✅ သိမ်းပြီးပါပြီ - {file_name}")
+    print("Checking for new files in bot messages...")
+    
+    # ဤအပိုင်းသည် Bot ဆီသို့ သင်နောက်ဆုံးပို့ထားသော Update များကို စစ်ဆေးသည်
+    updates = bot.get_updates()
+    added_count = 0
+    
+    for update in updates:
+        if update.message and update.message.document:
+            file_id = update.message.message_id
+            # စာရင်းထဲမှာ မရှိသေးရင် အသစ်ထည့်မယ်
+            if not any(g['original_msg_id'] == file_id for g in db["games"]):
+                file_name = update.message.document.file_name.replace(".apk", "").replace("-", " ").title()
+                db["games"].append({
+                    "original_msg_id": file_id,
+                    "chat_id": update.message.chat.id,
+                    "name": file_name
+                })
+                added_count += 1
+    
+    if added_count > 0:
+        save_db(db)
+        print(f"ဂိမ်းအသစ် {added_count} ခုကို Database ထဲ Auto ထည့်ပြီးပါပြီ။")
+    else:
+        print("ဂိမ်းအသစ် မတွေ့ပါ။")
 
 def auto_run_process():
-    print("Process စတင်နေပြီ...")
+    sync_new_files() # အရင်ဆုံး ဖိုင်အသစ်တွေကို စာရင်းထဲ အလိုလို သွင်းမယ်
+    
     db = load_db()
     all_games = db.get("games", [])
     posted_ids = db.get("posted_ids", [])
     
-    # မတင်ရသေးတဲ့ Game ရှာမယ်
     available = [g for g in all_games if str(g["original_msg_id"]) not in posted_ids]
-    
-    print(f"စုစုပေါင်း Game: {len(all_games)} ခုရှိပြီး မတင်ရသေးတာ {len(available)} ခု ရှိပါတယ်။")
 
     if not available:
-        print("တင်စရာ Game မရှိပါ။ ဖိုင်အရင်ပို့ထားပါ။")
+        print("တင်စရာ ဂိမ်းမရှိပါ။")
         return
 
     selected = random.choice(available)
     try:
-        # ၁။ File ကို Storage ဆီပို့မယ်
-        sent_file = bot.copy_message(FILE_STORE_CH, selected["from_chat_id"], selected["original_msg_id"])
+        # ၁။ Storage Channel ဆီ File ကို Copy ကူးပို့မယ်
+        sent_file = bot.copy_message(FILE_STORE_CH, selected["chat_id"], selected["original_msg_id"])
         
         # ၂။ Link တည်ဆောက်မယ်
         clean_ch = FILE_STORE_CH.replace("@", "")
         file_link = f"https://t.me/{clean_ch}/{sent_file.message_id}"
 
-        # ၃။ Post တင်မယ်
+        # ၃။ Main Channel မှာ Post တင်မယ်
         caption = (
             f"Game: **{selected['name']}** ❞\n\n"
             f"Offline 🚩 ❞\n\n"
@@ -73,16 +86,15 @@ def auto_run_process():
         )
         bot.send_message(POST_CH, caption, parse_mode="Markdown")
         
-        # ၄။ မှတ်တမ်းသွင်းမယ်
+        # ၄။ တင်ပြီးကြောင်း မှတ်မယ်
         db["posted_ids"].append(str(selected["original_msg_id"]))
         save_db(db)
-        print(f"အောင်မြင်စွာ တင်ပြီးပါပြီ: {selected['name']}")
+        print(f"Success: Posted {selected['name']}")
     except Exception as e:
-        print(f"အမှားဖြစ်သွားပါတယ်: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--post":
         auto_run_process()
     else:
         bot.polling(none_stop=True)
-       import
