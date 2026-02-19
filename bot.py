@@ -17,7 +17,11 @@ def load_db():
         try:
             with open(DB_FILE, 'r') as f:
                 data = json.load(f)
-                return data if "file_links" in data else {"games": [], "posted_ids": [], "file_links": {}}
+                # လိုအပ်သော Field များပါဝင်မှု ရှိမရှိ စစ်ဆေးခြင်း
+                if "games" not in data: data["games"] = []
+                if "posted_ids" not in data: data["posted_ids"] = []
+                if "file_links" not in data: data["file_links"] = {}
+                return data
         except:
             return {"games": [], "posted_ids": [], "file_links": {}}
     return {"games": [], "posted_ids": [], "file_links": {}}
@@ -30,22 +34,19 @@ def auto_run_process():
     db = load_db()
     updates = bot.get_updates()
     
+    # ၁။ Syncing: အသစ်ပို့ထားသမျှ ဖိုင်နှင့် Post များကို စာရင်းသွင်းခြင်း
     for up in updates:
         if not up.message: continue
         msg = up.message
         
-        # ၁။ APK File Link ဖမ်းယူခြင်း
+        # File Link မှတ်သားခြင်း
         if msg.document and msg.document.file_name.endswith(".apk"):
-            # File ကို Storage ဆီ ပို့ပြီး Link ယူမယ်
-            sent_file = bot.copy_message(FILE_STORE_CH, msg.chat.id, msg.message_id)
-            clean_ch = FILE_STORE_CH.replace("@", "")
-            direct_link = f"https://t.me/{clean_ch}/{sent_file.message_id}"
-            
-            # ဂိမ်းနာမည်ကို File Name ကနေ ယူမယ်
             file_key = msg.document.file_name.split("-v")[0].replace("-", " ").lower().strip()
-            db["file_links"][file_key] = direct_link
+            clean_ch = FILE_STORE_CH.replace("@", "")
+            # Direct Message Link
+            db["file_links"][file_key] = f"https://t.me/{clean_ch}/{msg.message_id}"
 
-        # ၂။ Post အလှကို မှတ်သားခြင်း
+        # Post (ပုံ+စာ) မှတ်သားခြင်း
         elif (msg.caption or msg.text) and (msg.photo or msg.video):
             text = msg.caption if msg.caption else msg.text
             if "Game:" in text:
@@ -58,36 +59,41 @@ def auto_run_process():
                     })
     save_db(db)
 
-    # ၃။ တစ်ခုတည်းကို ရွေးချယ်တင်ခြင်း
+    # ၂။ Filtering: တင်ပြီးသား ID များကို ဖယ်ထုတ်ပြီး ကျန်တာထဲမှ ကျပန်း (Random) တစ်ခုရွေးခြင်း
     available = [g for g in db["games"] if str(g["post_id"]) not in db["posted_ids"]]
-    if not available: return
+    
+    if not available:
+        print("တင်စရာ အသစ်မရှိတော့ပါ။")
+        return
 
     selected = random.choice(available)
     game_key = selected["name"].lower().strip()
-    download_url = db["file_links"].get(game_key, "https://t.me/offlinegamelink")
+    # ဖိုင်လင့်ခ် ရှိမရှိစစ်၊ မရှိရင် Channel Link ပြပေးမယ်
+    download_url = db["file_links"].get(game_key, f"https://t.me/{FILE_STORE_CH.replace('@','')}")
 
     try:
-        # ၄။ ပုံရော စာရော အကုန်ပါအောင် Copy Message ကို သုံးမယ်
-        # ပြီးမှ Caption ကို Link အမှန်နဲ့ ပြင်မယ်
+        # ၃။ တင်ဆက်ခြင်း: ပုံစံမပျက် Forward လုပ်ပြီးမှ Caption ကို ပြန်ပြင်ခြင်း
         sent_msg = bot.copy_message(POST_CH, selected["chat_id"], selected["post_id"])
         
-        # Link ထည့်ရန်အတွက် Caption ကို ပြန်ပြင်မယ်
-        # (Download ဆိုတဲ့ စာသားနေရာမှာ Link မြှုပ်ပေးမယ်)
-        post_msg = bot.get_message(selected["chat_id"], selected["post_id"])
-        new_caption = post_msg.caption.replace("[ Download ]", f"[Download]({download_url})")
-        new_caption = new_caption.replace("Download", f"[Download]({download_url})")
+        orig = bot.get_message(selected["chat_id"], selected["post_id"])
+        caption = orig.caption if orig.caption else orig.text
+        
+        # Link မြှုပ်ခြင်း (Markdown သုံးထားသည်)
+        caption = caption.replace("[ Download ]", f"[Download]({download_url})")
+        caption = caption.replace("Download", f"[Download]({download_url})")
 
         bot.edit_message_caption(
             chat_id=POST_CH,
             message_id=sent_msg.message_id,
-            caption=new_caption,
+            caption=caption,
             parse_mode="Markdown",
-            disable_web_page_preview=True # Preview ပိတ်ထားတယ်
+            disable_web_page_preview=True # Preview ပိတ်ရန်
         )
         
+        # ၄။ Logging: တင်ပြီးသားအဖြစ် မှတ်သားခြင်း (နောက်တစ်ခါ လုံးဝ ပြန်မတင်ရန်)
         db["posted_ids"].append(str(selected["post_id"]))
         save_db(db)
-        print(f"Success: Posted {selected['name']} with Link and Image.")
+        print(f"Success: Randomly Posted {selected['name']}.")
         return 
 
     except Exception as e:
