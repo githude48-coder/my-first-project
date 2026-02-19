@@ -11,6 +11,8 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # ဒီစာကြောင်းက အလိုလို ပြင်ခွင့်ပေးတာပါ
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -26,10 +28,10 @@ jobs:
       - name: Start Bot
         run: python bot.py --post
 
-      - name: Save Memory
+      - name: Save Memory to GitHub
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add database.json
-          git commit -m "Update history" || exit 0
+          git commit -m "Update posted_ids history" || echo "No changes to commit"
           git push
