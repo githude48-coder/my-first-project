@@ -1,18 +1,4 @@
 {
-    "games": [
-        {
-            "name": "Days After - zombie survival",
-            "post_id": 24,
-            "chat_id": 6791815865
-        },
-        {
-            "name": "Human Resource Machine",
-            "post_id": 27,
-            "chat_id": 6791815865
-        }
-    ],
-    "posted_ids": [
-        "24",
-        "27"
-    ]
+  "games": [],
+  "posted_ids": []
 }
