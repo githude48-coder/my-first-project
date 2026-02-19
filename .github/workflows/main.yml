@@ -4,7 +4,8 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '0 0,6,12,18 * * *'
+    # Myanmar Time: 6:00 AM, 12:30 PM, 7:00 PM
+    - cron: '30 23,6,12 * * *'
 
 jobs:
   run-bot:
@@ -31,5 +32,5 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add database.json
-          git commit -m "Auto-update database" || echo "No changes to commit"
+          git commit -m "Update posted history" || echo "No changes"
           git push
