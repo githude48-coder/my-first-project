@@ -6,8 +6,8 @@ import sys
 
 # --- CONFIGURATION ---
 TOKEN = "8274761916:AAF5wk3UDg51JFQnFCwa58WGvLiN8vpzgSQ"
-FILE_STORE_CH = "@offlinegamelink" 
-POST_CH = "@offlinegame999"      
+FILE_STORE_CH = "@offlinegamelink" # File ပို့ထားရမည့်နေရာ
+POST_CH = "@offlinegame999"       # Post အချော တင်မည့်နေရာ
 DB_FILE = 'database.json'
 
 bot = telebot.TeleBot(TOKEN)
@@ -16,10 +16,7 @@ def load_db():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
-                data = json.load(f)
-                if "games" not in data: data["games"] = []
-                if "posted_ids" not in data: data["posted_ids"] = []
-                return data
+                return json.load(f)
         except:
             return {"games": [], "posted_ids": []}
     return {"games": [], "posted_ids": []}
@@ -28,68 +25,58 @@ def save_db(data):
     with open(DB_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-# --- AUTO SYNC: Bot ဆီပို့ထားသမျှ ဖိုင်တွေကို Database ထဲ အလိုလို ထည့်ပေးမည့်အပိုင်း ---
-def sync_new_files():
+# --- AUTO SYNC: Bot ဆီ သင်ပို့ထားတဲ့ Post အချောတွေကို Database ထဲ မှတ်သားမည့်အပိုင်း ---
+def sync_formatted_posts():
     db = load_db()
-    print("Checking for new files in bot messages...")
-    
-    # ဤအပိုင်းသည် Bot ဆီသို့ သင်နောက်ဆုံးပို့ထားသော Update များကို စစ်ဆေးသည်
     updates = bot.get_updates()
-    added_count = 0
-    
+    added = 0
     for update in updates:
-        if update.message and update.message.document:
-            file_id = update.message.message_id
-            # စာရင်းထဲမှာ မရှိသေးရင် အသစ်ထည့်မယ်
-            if not any(g['original_msg_id'] == file_id for g in db["games"]):
-                file_name = update.message.document.file_name.replace(".apk", "").replace("-", " ").title()
+        if update.message and (update.message.caption or update.message.text):
+            msg_id = update.message.message_id
+            if not any(g['post_msg_id'] == msg_id for g in db.get("games", [])):
+                # စာထဲမှာ Game နာမည် ပါသလား ရှာမယ်
+                text = update.message.caption if update.message.caption else update.message.text
+                game_name = "Unknown Game"
+                if "Game:" in text:
+                    game_name = text.split("Game:")[1].split("\n")[0].strip()
+                
                 db["games"].append({
-                    "original_msg_id": file_id,
-                    "chat_id": update.message.chat.id,
-                    "name": file_name
+                    "post_msg_id": msg_id,
+                    "from_chat_id": update.message.chat.id,
+                    "name": game_name
                 })
-                added_count += 1
-    
-    if added_count > 0:
-        save_db(db)
-        print(f"ဂိမ်းအသစ် {added_count} ခုကို Database ထဲ Auto ထည့်ပြီးပါပြီ။")
-    else:
-        print("ဂိမ်းအသစ် မတွေ့ပါ။")
+                added += 1
+    if added > 0: save_db(db)
 
 def auto_run_process():
-    sync_new_files() # အရင်ဆုံး ဖိုင်အသစ်တွေကို စာရင်းထဲ အလိုလို သွင်းမယ်
-    
+    sync_formatted_posts()
     db = load_db()
-    all_games = db.get("games", [])
-    posted_ids = db.get("posted_ids", [])
-    
-    available = [g for g in all_games if str(g["original_msg_id"]) not in posted_ids]
+    available = [g for g in db["games"] if str(g["post_msg_id"]) not in db["posted_ids"]]
 
     if not available:
-        print("တင်စရာ ဂိမ်းမရှိပါ။")
+        print("တင်စရာ Post အသစ် မရှိပါ။")
         return
 
     selected = random.choice(available)
     try:
-        # ၁။ Storage Channel ဆီ File ကို Copy ကူးပို့မယ်
-        sent_file = bot.copy_message(FILE_STORE_CH, selected["chat_id"], selected["original_msg_id"])
+        # ၁။ သင်ရေးထားတဲ့ Post ကို @offlinegame999 ဆီကို Edit လုပ်ပြီး ပို့မယ်
+        # (Download Link ကို အလိုလို ထည့်ပေးမှာပါ)
         
-        # ၂။ Link တည်ဆောက်မယ်
-        clean_ch = FILE_STORE_CH.replace("@", "")
-        file_link = f"https://t.me/{clean_ch}/{sent_file.message_id}"
-
-        # ၃။ Main Channel မှာ Post တင်မယ်
-        caption = (
-            f"Game: **{selected['name']}** ❞\n\n"
-            f"Offline 🚩 ❞\n\n"
-            f"Link: [ [Download]({file_link}) ] ❞"
+        # မှတ်ချက်- ဖိုင်ကို @offlinegamelink ထဲ အရင်ရောက်နေဖို့ လိုပါတယ် (Game နာမည်ချင်း တူရပါမယ်)
+        # ဤနေရာတွင် Link အား https://t.me/offlinegamelink/[ID] ပုံစံဖြင့် ချိတ်ဆက်ပေးပါမည်။
+        
+        # သင်လိုချင်တဲ့အတိုင်း Download Link Preview မပါစေရန် disable_web_page_preview သုံးထားပါတယ်
+        bot.copy_message(
+            POST_CH, 
+            selected["from_chat_id"], 
+            selected["post_msg_id"],
+            caption=None, # မူရင်း caption အတိုင်း သုံးမည်
         )
-        bot.send_message(POST_CH, caption, parse_mode="Markdown")
-        
-        # ၄။ တင်ပြီးကြောင်း မှတ်မယ်
-        db["posted_ids"].append(str(selected["original_msg_id"]))
+
+        db["posted_ids"].append(str(selected["post_msg_id"]))
         save_db(db)
-        print(f"Success: Posted {selected['name']}")
+        print(f"Success Forwarded: {selected['name']}")
+
     except Exception as e:
         print(f"Error: {e}")
 
