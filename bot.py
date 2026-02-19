@@ -7,7 +7,7 @@ import sys
 # --- CONFIGURATION ---
 TOKEN = "8274761916:AAF5wk3UDg51JFQnFCwa58WGvLiN8vpzgSQ"
 OFFLINE_CH = "@offlinegamelink" # ဖိုင်တွေ သိမ်းမယ့်နေရာ
-MAIN_CH = "@offlinegame999"    # Post တင်မယ့်နေရာ
+MAIN_CH = "@offlinegame99"      # Post တင်မယ့်နေရာ (Screenshot အရ @offlinegame99 ဖြစ်နေလို့ ပြန်ပြင်ပေးထားပါတယ်)
 DB_FILE = 'database.json'
 
 bot = telebot.TeleBot(TOKEN)
@@ -16,7 +16,8 @@ def load_db():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
-                return json.load(f)
+                content = f.read().strip()
+                return json.loads(content) if content else {"games": [], "posted_ids": []}
         except:
             return {"games": [], "posted_ids": []}
     return {"games": [], "posted_ids": []}
@@ -25,35 +26,34 @@ def save_db(data):
     with open(DB_FILE, 'w') as f:
         json.dump(data, f, indent=4)
 
-# ၁။ Bot ဆီ File ပို့ရင် Forward ဖျောက်ပြီး ပို့မယ့်အပိုင်း
+# ၁။ Bot ဆီ ဖိုင်ပို့ရင် Forward ဖျောက်သိမ်းမယ့်အပိုင်း
 @bot.message_handler(content_types=['document'])
 def handle_file(message):
     db = load_db()
     file_name = message.document.file_name
     
     try:
-        # copy_message က Forward Tag မပါဘဲ ပို့ပေးတာပါ
+        # Forward ဖျောက်ပြီး ပို့ခြင်း (Copy Message)
         sent_msg = bot.copy_message(OFFLINE_CH, message.chat.id, message.message_id)
         
-        # Link ဖန်တီးခြင်း (Channel က Public ဖြစ်ဖို့လိုပါတယ်)
-        # Link ပုံစံ: https://t.me/offlinegamelink/123
-        clean_ch_name = OFFLINE_CH.replace("@", "")
-        file_link = f"https://t.me/{clean_ch_name}/{sent_msg.message_id}"
+        # Link ဖန်တီးခြင်း
+        clean_ch = OFFLINE_CH.replace("@", "")
+        file_link = f"https://t.me/{clean_ch}/{sent_msg.message_id}"
         
         new_game = {
             "id": sent_msg.message_id, 
-            "name": file_name, 
+            "name": file_name.replace(".apk", "").replace("-", " ").title(), # နာမည်ကို လှလှပပ ပြင်ပေးခြင်း
             "link": file_link
         }
         
         db["games"].append(new_game)
         save_db(db)
-        bot.reply_to(message, f"✅ သိမ်းပြီးပါပြီ- {file_name}")
+        bot.reply_to(message, f"✅ Database ထဲ သိမ်းလိုက်ပါပြီ - {file_name}")
     except Exception as e:
         bot.reply_to(message, f"Error: {e}")
 
-# ၂။ ကျပန်းစနစ်နဲ့ Post တင်မည့် Function
-def auto_post():
+# ၂။ ကျပန်းစနစ်နဲ့ Post တင်မည့် Function (GitHub Actions က ဒါကို ခေါ်သုံးမှာပါ)
+def run_auto_post():
     db = load_db()
     all_games = db.get("games", [])
     posted_ids = db.get("posted_ids", [])
@@ -62,19 +62,19 @@ def auto_post():
         print("တင်စရာ Game မရှိသေးပါ။")
         return
 
-    # တင်ပြီးသားတွေ Limit ပြည့်သွားရင် (အကုန်ကုန်သွားရင်) အစက ပြန်စမယ်
+    # တင်ပြီးသားတွေ အားလုံးကုန်သွားရင် အစက ပြန်စမယ်
     if len(posted_ids) >= len(all_games):
         db["posted_ids"] = []
         posted_ids = []
-        print("Limit ပြည့်သွားလို့ အစက ပြန်စပါမယ်။")
+        print("Limit ပြည့်သွားပြီဖြစ်လို့ အစက ပြန်စပါမယ်။")
 
-    # မတင်ရသေးတဲ့ Game တွေကိုပဲ ရွေးမယ်
+    # မတင်ရသေးတဲ့ Game ကို ရှာမယ်
     available = [g for g in all_games if g["id"] not in posted_ids]
     if not available: return
     
     selected = random.choice(available)
 
-    # Post ပုံစံ (Game နာမည် နဲ့ Download Link ပါမယ်)
+    # Post ပုံစံ (Screenshot ထဲကအတိုင်း)
     caption = (
         f"Game: {selected['name']} ❞\n\n"
         f"Offline 🚩 ❞\n\n"
@@ -85,13 +85,14 @@ def auto_post():
         bot.send_message(MAIN_CH, caption, parse_mode="Markdown")
         db["posted_ids"].append(selected["id"])
         save_db(db)
-        print(f"အောင်မြင်စွာ တင်ပြီးပါပြီ- {selected['name']}")
+        print(f"Posted: {selected['name']}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error Posting: {e}")
 
+# GitHub Actions က နှိုးလိုက်ရင် Post တင်ဖို့ အပိုင်း
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--post":
-        auto_post()
+        run_auto_post()
     else:
-        print("Bot စတင်နေပါပြီ... ဖိုင်များ ပို့နိုင်ပါသည်။")
+        print("Bot is listening for files...")
         bot.polling(none_stop=True)
