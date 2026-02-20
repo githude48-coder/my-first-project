@@ -5,7 +5,7 @@ import os
 
 # --- CONFIGURATION ---
 TOKEN = "8274761916:AAF5wk3UDg51JFQnFCwa58WGvLiN8vpzgSQ"
-FILE_STORE_CH = "@offlinegamelink" 
+FILE_STORE_CH = "offlinegamelink" # @ မပါဘဲ Channel ID သီးသန့်
 POST_CH = "@offlinegame999"      
 DB_FILE = 'database.json'
 
@@ -16,10 +16,10 @@ def load_db():
         try:
             with open(DB_FILE, 'r') as f:
                 data = json.load(f)
-                if "file_data" not in data: data["file_data"] = {}
+                if "file_links" not in data: data["file_links"] = {}
                 return data
         except: pass
-    return {"games": [], "posted_ids": [], "file_data": {}}
+    return {"games": [], "posted_ids": [], "file_links": {}}
 
 def save_db(data):
     with open(DB_FILE, 'w') as f:
@@ -33,17 +33,14 @@ def auto_run_process():
         if not up.message: continue
         msg = up.message
         
-        # ၁။ File သိမ်းဆည်းခြင်း (ပိုမိုကောင်းမွန်သော နာမည်စစ်ဆေးမှု)
+        # ၁။ File Channel ထဲက Message ID ကို ယူပြီး Link လုပ်မယ်
         if msg.document and msg.document.file_name.endswith(".apk"):
-            # ရှေ့ဆုံးက စာလုံး ၂ လုံးကို ယူမယ် (ဥပမာ- days after)
-            file_key = " ".join(msg.document.file_name.lower().replace("-", " ").split()[:2])
-            db["file_data"][file_key] = {
-                "message_id": msg.message_id,
-                "chat_id": msg.chat.id,
-                "url": f"https://t.me/{FILE_STORE_CH.replace('@','')}/{msg.message_id}"
-            }
+            # နာမည်ကို ရှင်းပြီး Key လုပ်မယ် (ဥပမာ- days after)
+            f_name = msg.document.file_name.lower().replace("-", " ").replace("_", " ")
+            file_key = f_name.split("v1")[0].split("v2")[0].strip()
+            db["file_links"][file_key] = f"https://t.me/{FILE_STORE_CH}/{msg.message_id}"
 
-        # ၂။ Post သိမ်းဆည်းခြင်း
+        # ၂။ Post သိမ်းမယ်
         elif (msg.caption or msg.text) and (msg.photo or msg.video):
             text = msg.caption if msg.caption else msg.text
             if "Game:" in text:
@@ -57,31 +54,29 @@ def auto_run_process():
                     })
     save_db(db)
 
+    # ၃။ တစ်ခုပဲ ရွေးတင်မယ်
     available = [g for g in db["games"] if str(g["post_id"]) not in db["posted_ids"]]
     if not available: return
 
     selected = random.choice(available)
-    # ရှေ့ဆုံးစာလုံး ၂ လုံးနဲ့ ပြန်ရှာမယ်
-    search_key = " ".join(selected["name"].split()[:2])
-    file_info = db["file_data"].get(search_key)
-    
-    download_url = file_info["url"] if file_info else f"https://t.me/{FILE_STORE_CH.replace('@','')}"
+    # ရှေ့ဆုံးစာလုံးနဲ့ Link ရှာမယ်
+    search_key = selected["name"].split("-")[0].strip()
+    download_url = db["file_links"].get(search_key, f"https://t.me/{FILE_STORE_CH}")
 
     try:
-        # ၃။ Post တင်ခြင်း (Link ပါဝင်သော Caption နှင့်)
+        # ၄။ Post ကိုပဲ Channel ထဲ တင်မယ် (File မပါဘူး)
+        # [ Download ] နေရာမှာ Link မြှုပ်ပေးမယ်
         new_caption = selected["caption"].replace("[ Download ]", f"[Download]({download_url})")
         
         orig_msg = bot.get_message(selected["chat_id"], selected["post_id"])
         if orig_msg.photo:
             bot.send_photo(POST_CH, orig_msg.photo[-1].file_id, caption=new_caption, parse_mode="Markdown", disable_web_page_preview=True)
-        
-        # ၄။ File ကို ချက်ချင်းလိုက်တင်ခြင်း (ဒီအပိုင်းက အရေးကြီးဆုံး)
-        if file_info:
-            bot.copy_message(POST_CH, file_info["chat_id"], file_info["message_id"])
+        elif orig_msg.video:
+            bot.send_video(POST_CH, orig_msg.video.file_id, caption=new_caption, parse_mode="Markdown", disable_web_page_preview=True)
         
         db["posted_ids"].append(str(selected["post_id"]))
         save_db(db)
-        print("Success!")
+        print("Post uploaded with deep link!")
     except Exception as e:
         print(f"Error: {e}")
 
