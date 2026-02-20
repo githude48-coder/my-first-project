@@ -25,31 +25,42 @@ def save_db(data):
 
 def auto_run_process():
     db = load_db()
-    # အချက်အလက်အသစ်တွေကို ပြန်ဖတ်မယ်
-    updates = bot.get_updates(offset=-50, limit=50)
+    # Update အသစ်တွေ အကုန်ဖတ်မယ်
+    updates = bot.get_updates(offset=-100, limit=100)
     
-    found_post = None
-
+    # ၁။ အရင်ဆုံး File Link တွေကို Database ထဲမှာ Auto မှတ်မယ်
     for up in updates:
         if not up.message: continue
         msg = up.message
-        
-        # Post (ပုံ+စာ) ကို ရှာမယ်
+        if msg.document and msg.document.file_name.endswith(".apk"):
+            # နာမည်ကို ရှင်းပြီး သိမ်းမယ် (ဥပမာ- asphalt 8)
+            f_name = msg.document.file_name.lower().replace("-", " ").replace("_", " ")
+            file_key = " ".join(f_name.split()[:2]) 
+            db["file_links"][file_key] = f"https://t.me/{FILE_STORE_CH}/{msg.message_id}"
+
+    # ၂။ Post အသစ်တစ်ခု ရှာမယ်
+    found_post = None
+    for up in updates:
+        if not up.message: continue
+        msg = up.message
         if (msg.photo or msg.video) and msg.caption and "Game:" in msg.caption:
             if str(msg.message_id) not in db["posted_ids"]:
                 found_post = msg
-                break # တစ်ခါ Run ရင် တစ်ခုပဲ တင်မယ်
+                break
 
+    # ၃။ Post တွေ့ရင် တင်မယ်
     if found_post:
         try:
-            game_name = found_post.caption.split("Game:")[1].split("\n")[0].strip().lower()
-            # Database ထဲမှာ လင့်ခ်ရှိမရှိ စစ်မယ်
-            download_url = db.get("file_links", {}).get(game_name, f"https://t.me/{FILE_STORE_CH}")
-
-            # [ Download ] ကို Link ပြောင်းမယ်
-            new_caption = found_post.caption.replace("[ Download ]", f"[Download]({download_url})")
+            caption = found_post.caption
+            game_name = caption.split("Game:")[1].split("\n")[0].strip().lower()
+            search_key = " ".join(game_name.split()[:2])
             
-            # Post ကို တင်မယ် (File ကို လုံးဝ မတင်ပါ)
+            # File Link ကို ရှာမယ်
+            download_url = db["file_links"].get(search_key, f"https://t.me/{FILE_STORE_CH}")
+
+            # Link မြှုပ်မယ်
+            new_caption = caption.replace("[ Download ]", f"[Download]({download_url})")
+            
             if found_post.photo:
                 bot.send_photo(POST_CH, found_post.photo[-1].file_id, caption=new_caption, parse_mode="Markdown", disable_web_page_preview=True)
             elif found_post.video:
@@ -57,11 +68,11 @@ def auto_run_process():
 
             db["posted_ids"].append(str(found_post.message_id))
             save_db(db)
-            print(f"Success! Posted {game_name}")
+            print(f"Success! Posted: {game_name}")
         except Exception as e:
             print(f"Error: {e}")
     else:
-        print("တင်စရာ Post အသစ် ရှာမတွေ့ပါ။")
+        print("တင်စရာ အသစ်မရှိသေးပါ။")
 
 if __name__ == "__main__":
     auto_run_process()
