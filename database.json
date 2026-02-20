@@ -23,5 +23,32 @@
     "file_links": {
         "human resource machine": "https://t.me/offlinegamelink/54",
         "days after": "https://t.me/offlinegamelink/55"
+    },
+    "file_data": {
+        "days after": {
+            "message_id": 25,
+            "chat_id": 6791815865,
+            "url": "https://t.me/offlinegamelink/25"
+        },
+        "human resource": {
+            "message_id": 28,
+            "chat_id": 6791815865,
+            "url": "https://t.me/offlinegamelink/28"
+        },
+        "spongebob krusty": {
+            "message_id": 29,
+            "chat_id": 6791815865,
+            "url": "https://t.me/offlinegamelink/29"
+        },
+        "slender threads": {
+            "message_id": 31,
+            "chat_id": 6791815865,
+            "url": "https://t.me/offlinegamelink/31"
+        },
+        "asphalt 8": {
+            "message_id": 33,
+            "chat_id": 6791815865,
+            "url": "https://t.me/offlinegamelink/33"
+        }
     }
 }
