@@ -3,6 +3,7 @@ import json
 import random
 import os
 
+# --- CONFIGURATION ---
 TOKEN = "8274761916:AAF5wk3UDg51JFQnFCwa58WGvLiN8vpzgSQ"
 FILE_STORE_CH = "offlinegamelink" 
 POST_CH = "@offlinegame999"      
@@ -16,7 +17,7 @@ def load_db():
             with open(DB_FILE, 'r') as f:
                 return json.load(f)
         except: pass
-    return {"games": [], "posted_ids": [], "file_links": {}}
+    return {"posted_ids": [], "file_links": {}}
 
 def save_db(data):
     with open(DB_FILE, 'w') as f:
@@ -24,48 +25,43 @@ def save_db(data):
 
 def auto_run_process():
     db = load_db()
-    updates = bot.get_updates(offset=-50, limit=100)
+    # အချက်အလက်အသစ်တွေကို ပြန်ဖတ်မယ်
+    updates = bot.get_updates(offset=-50, limit=50)
     
+    found_post = None
+
     for up in updates:
         if not up.message: continue
         msg = up.message
         
-        # Post သိမ်းခြင်း
-        if (msg.caption or msg.text) and (msg.photo or msg.video):
-            text = msg.caption if msg.caption else msg.text
-            if "Game:" in text:
-                game_name = text.split("Game:")[1].split("\n")[0].strip().lower()
-                if not any(g['post_id'] == msg.message_id for g in db["games"]):
-                    db["games"].append({
-                        "name": game_name,
-                        "post_id": msg.message_id,
-                        "chat_id": msg.chat.id,
-                        "caption": text
-                    })
-    save_db(db)
+        # Post (ပုံ+စာ) ကို ရှာမယ်
+        if (msg.photo or msg.video) and msg.caption and "Game:" in msg.caption:
+            if str(msg.message_id) not in db["posted_ids"]:
+                found_post = msg
+                break # တစ်ခါ Run ရင် တစ်ခုပဲ တင်မယ်
 
-    available = [g for g in db["games"] if str(g["post_id"]) not in db["posted_ids"]]
-    if not available: return
+    if found_post:
+        try:
+            game_name = found_post.caption.split("Game:")[1].split("\n")[0].strip().lower()
+            # Database ထဲမှာ လင့်ခ်ရှိမရှိ စစ်မယ်
+            download_url = db.get("file_links", {}).get(game_name, f"https://t.me/{FILE_STORE_CH}")
 
-    selected = random.choice(available)
-    # Database ထဲက လင့်ခ်ကို တိုက်ရိုက်ယူမယ်
-    download_url = db["file_links"].get(selected["name"], f"https://t.me/{FILE_STORE_CH}")
+            # [ Download ] ကို Link ပြောင်းမယ်
+            new_caption = found_post.caption.replace("[ Download ]", f"[Download]({download_url})")
+            
+            # Post ကို တင်မယ် (File ကို လုံးဝ မတင်ပါ)
+            if found_post.photo:
+                bot.send_photo(POST_CH, found_post.photo[-1].file_id, caption=new_caption, parse_mode="Markdown", disable_web_page_preview=True)
+            elif found_post.video:
+                bot.send_video(POST_CH, found_post.video.file_id, caption=new_caption, parse_mode="Markdown", disable_web_page_preview=True)
 
-    try:
-        # Download စာသားကို လင့်ခ်အဖြစ် ပြောင်းလဲခြင်း
-        new_caption = selected["caption"].replace("[ Download ]", f"[Download]({download_url})")
-        
-        orig_msg = bot.get_message(selected["chat_id"], selected["post_id"])
-        
-        # Post ကိုပဲ တင်မယ် (File ကို လုံးဝ ထပ်မတင်တော့ပါ)
-        if orig_msg.photo:
-            bot.send_photo(POST_CH, orig_msg.photo[-1].file_id, caption=new_caption, parse_mode="Markdown", disable_web_page_preview=True)
-        
-        db["posted_ids"].append(str(selected["post_id"]))
-        save_db(db)
-        print(f"Success! Posted {selected['name']} with Link.")
-    except Exception as e:
-        print(f"Error: {e}")
+            db["posted_ids"].append(str(found_post.message_id))
+            save_db(db)
+            print(f"Success! Posted {game_name}")
+        except Exception as e:
+            print(f"Error: {e}")
+    else:
+        print("တင်စရာ Post အသစ် ရှာမတွေ့ပါ။")
 
 if __name__ == "__main__":
     auto_run_process()
